@@ -1,8 +1,9 @@
 //TODO: Find better way to import env.
 import './env.js'
 
-const snoopDoggID = '7hJcb9fa4alzcOq3EaNPoG'
-var artistIDsToTraverse = [snoopDoggID]
+var artistIDsToTraverse = []
+var visitedArtists = []
+var visitedTracks = []
 var IDtoName = {}
 var IDtoCatalogue = {}
 
@@ -10,6 +11,7 @@ const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token/'
 const SPOTIFY_API_URL = 'https://api.spotify.com/v1/'
 
 connectAPIs()
+
 async function searchSpotify(authentication, searchParameters) {
     const searchParameterObject = new URLSearchParams(searchParameters)
     const searchAPIURL = SPOTIFY_API_URL + 'search?' + searchParameters
@@ -70,7 +72,7 @@ async function authenticateSpotify() {
 async function connectAPIs() {
 
     //Get Spotify API Authentication Details
-    authenticateSpotify().then(authenticationDetails => {
+    /*authenticateSpotify().then(authenticationDetails => {
         //Search for artist details
         var trackLimit = 20
         const SEARCH_DETAILS = `type=track&q=artist:Kendrick Lamar&limit=${trackLimit}`
@@ -79,23 +81,14 @@ async function connectAPIs() {
         //Traverse the list of artists.
         //console.log(artistDetails)
         traverseArtists(artistDetails)
-    })
-}
-/*var options = {
-    hostname: 'https://accounts.spotify.com',
-    path: '/api/token',
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': post_data.length
-    }
-}
+    })*/
 
-var req = https.request(options, (res) => {
-    console.log(`statusCode: ${res.statusCode}`)
-    console.log(`headers: ${res.headers}`)
+    var authenticationDetails = await authenticateSpotify()
 
-    res.on('data', (data) => {
-        console.log(data)
-    })
-})*/
+    var trackLimit = 20
+    const SEARCH_DETAILS = `type=track&q=artist:Kendrick Lamar&limit=${trackLimit}`
+    var artistDetails = await searchSpotify(authenticationDetails, SEARCH_DETAILS)
+
+    traverseArtists(artistDetails)
+
+}
