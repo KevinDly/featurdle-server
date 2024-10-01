@@ -1,11 +1,12 @@
 //TODO: Find better way to import env.
 import './env.js'
 
-var artistsToExplore = [process.env.INITIAL_ARTIST]
-var visitedArtists = new Set([])
-var visitedTracks = []
-var IDtoName = {}
-var IDtoCatalogue = {}
+let artistsToExplore = [process.env.INITIAL_ARTIST]
+let visitedArtists = new Set([])
+let tracksToArtist = {}
+let visitedTracks = []
+let IDtoName = {}
+let IDtoCatalogue = {}
 
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token/'
 const SPOTIFY_API_URL = 'https://api.spotify.com/v1/'
@@ -14,49 +15,52 @@ const ARTIST_DEGREE = process.env.SEARCH_DEGREE
 connectAPIs()
 
 async function searchSpotify(authentication, searchURL) {
-    //console.log(searchAPIURL)
-
     return fetch(searchURL, {
         headers: {
             'Authorization': `Bearer ${authentication["access_token"]}`
         }
-    }).then(res => res.json())
-    .then(res => {
-        //console.log("Spotify Search Results: ")
-        //console.log(res)
-        if(res.hasOwnProperty("error")) {
-            throw new Error(res['error']['message'])
+    }).then(res => {
+        console.log("Return status: " + res.status)
+        if(res.status !== 200) {
+            throw new Error(`Status code error ${res.status}`)
         }
+        return res.json()
+    })
+    .then(res => {
         return res
     })
 }
 
-function traverseArtists(res, artistList, artistExplored) {
+
+//TODO: Implement limit of how many features can be added to the artistList per artist.
+function traverseArtists(res, artistList, artistExplored, musicToArtist) {
     //Iterate through all tracks in res.
     res.tracks.items.forEach(item => {
+
         const trackName = item.name
         const trackArtists = item.artists
 
         //Iterate through each artist if more than one exists (if the song contains features)
-        if (item.artists.length > 1) {
-            var stringOfArtists = ""
-            for (var artist of trackArtists) {
+        if (item.artists.length > 1 && !(trackName in musicToArtist)) {
+            //Add artists to list.
+            let artistNames = []
+            for (const artist of trackArtists) {
                 const artistName = artist.name
-                stringOfArtists += `${artistName} `
+                artistNames.push(artistName)
                 if(!artistList.includes(artistName) && !artistExplored.has(artistName)){
                     artistList.push(artistName)
                 }
             }
 
-            console.log(`Name: ${trackName}`)
-            console.log(`Artists: ${stringOfArtists}`)
+            //Add track to list.
+            musicToArtist[trackName] = artistNames
         }
     })
 }
 
 async function authenticateSpotify() {
-    var SPOTIFY_ID = process.env.SPOTIFY_CLIENT_ID
-    var SPOTIFY_SECRET = process.env.SPOTIFY_CLIENT_SECRET
+    const SPOTIFY_ID = process.env.SPOTIFY_CLIENT_ID
+    const SPOTIFY_SECRET = process.env.SPOTIFY_CLIENT_SECRET
 
     const spotify_parameters = {
         'grant_type': 'client_credentials',
@@ -93,44 +97,75 @@ async function connectAPIs() {
     let currExplored = 0
     let currentDegree = 0
 
-
+    const start = Date.now()
+    try {
     while(artistsToExplore.length > 0 && currentDegree <= ARTIST_DEGREE) {
         const currentArtistName = artistsToExplore.shift()
 
         //Create search query for Spotify
-        let SEARCH_DETAILS = SPOTIFY_API_URL + 'search?' + `type=track&q=artist:${currentArtistName}&limit=${trackLimit}&offset=${offset}`
-
+        //let SEARCH_DETAILS = SPOTIFY_API_URL + 'search?' + `type=track&q=artist:${currentArtistName}&limit=${trackLimit}&offset=${offset}`
+        const SEARCH_URL = SPOTIFY_API_URL + 'search?'
+        const SEARCH_PARAMS = new URLSearchParams({
+            type: "track",
+            q: `artist:${currentArtistName}`,
+            limit: `${trackLimit}`,
+            offset: `${offset}`
+        })
+        let SEARCH_DETAILS = SEARCH_URL + SEARCH_PARAMS
         //Iterate until search pagination is done.
         while(SEARCH_DETAILS != null) {
             try {
                 //Add the current artist to list of names to traverse.
                 //TODO: Make into while loop, check the "next" key if its null or to continue loop or not.
-                var artistDetails = await searchSpotify(authenticationDetails, SEARCH_DETAILS) 
+                var artistDetails = await searchSpotify(authenticationDetails, SEARCH_DETAILS)
                 
                 //Check if there are still more songs to traverse for the current artist, if there are dont add to list and put the artist back onto the front of the list.
                 visitedArtists.add(currentArtistName)
 
                 //Look through the featured artists.
-                traverseArtists(artistDetails, artistsToExplore, visitedArtists)
+                traverseArtists(artistDetails, artistsToExplore, visitedArtists, tracksToArtist)
                 SEARCH_DETAILS = artistDetails['tracks']['next']
             }
             catch(e) {
                 console.log("Error")
-                console.error(e)
+                console.log("visitedArtists")
+                console.log(visitedArtists)
+                console.log(visitedArtists.size)
+                console.log("artistsToExplore")
+                console.log(artistsToExplore)
+                console.log(artistsToExplore.length)
+                console.log("Previous Search")
+                console.log(`${SEARCH_DETAILS}`)
+                console.log("Tracks to Artist")
+                console.log(tracksToArtist)
+                throw e
             }
         }
 
+        //console.log(currentDegree)
+        //console.log(artistsToExplore)
+        //console.log(visitedArtists)
         //TODO: Figure out if we need to add the if statements into the try/catch
         currExplored++
 
         //Update the degrees outward from the original artist we are.
         if(currExplored >= maxToExplore) {
+            console.log(`Updated degree from previous: ${currentDegree}`)
             currentDegree++
             maxToExplore = artistsToExplore.length
             currExplored = 0
         }
     }
+    }
+    catch(e) {
+        console.error(e)
+        //console.log(artistsToExplore)
+    }
+    const stop = Date.now()
+
+    console.log(`seconds elapsed = ${Math.floor((stop - start) / 1000)}`)
 
     console.log(visitedArtists)
     console.log(artistsToExplore)
+    console.log(tracksToArtist)
 }
