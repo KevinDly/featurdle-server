@@ -20,9 +20,8 @@ async function searchSpotify(authentication, searchURL) {
             'Authorization': `Bearer ${authentication["access_token"]}`
         }
     }).then(res => {
-        console.log("Return status: " + res.status)
         if(res.status !== 200) {
-            throw new Error(`Status code error ${res.status}`)
+            throw new Error(`Status code error ${res.status}, ${res.message}`)
         }
         return res.json()
     })
@@ -33,28 +32,51 @@ async function searchSpotify(authentication, searchURL) {
 
 
 //TODO: Implement limit of how many features can be added to the artistList per artist.
+//TODO: Find way to differentiate tracks that have different IDs but are the same (sorting artists on track, hashing, then checking?)
 function traverseArtists(res, artistList, artistExplored, musicToArtist) {
     //Iterate through all tracks in res.
-    res.tracks.items.forEach(item => {
-
-        const trackName = item.name
-        const trackArtists = item.artists
-
+    res.tracks.items.forEach(track => {
         //Iterate through each artist if more than one exists (if the song contains features)
-        if (item.artists.length > 1 && !(trackName in musicToArtist)) {
-            //Add artists to list.
-            let artistNames = []
-            for (const artist of trackArtists) {
-                const artistName = artist.name
-                artistNames.push(artistName)
-                if(!artistList.includes(artistName) && !artistExplored.has(artistName)){
-                    artistList.push(artistName)
-                }
-            }
+        const trackName = track.name
+        const trackArtists = track.artists
+        const trackID = track.id
+        const trackAlbum = track.album
+        const trackImage = trackAlbum.images[0].url
 
-            //Add track to list.
-            musicToArtist[trackName] = artistNames
+        //Check if song has no features or related artists, if it doesn't then return.
+        if(track.artists.length <= 1) {
+            return
         }
+
+        //Check if the track exists in the list, if not add a hashmap.
+        if(!(trackName in musicToArtist)) {
+            musicToArtist[trackName] = {}
+        } //If the track exists check if the id already exists, if it does return.
+        else if(trackID in musicToArtist[trackName]) {
+            return
+        }
+
+        let trackList = musicToArtist[trackName]
+
+        //Add artists to list.
+        let trackInformation = {}
+
+        //Grab list of artists.
+        let artistNames = []
+        for (const artist of trackArtists) {
+            const artistName = artist.name
+            artistNames.push(artistName)
+            if(!artistList.includes(artistName) && !artistExplored.has(artistName)){
+                artistList.push(artistName)
+            }
+        }
+
+        //Input track information
+        trackInformation['artists'] = artistNames
+        trackInformation['imageURL'] = trackImage
+
+        //Add tracks to list if it is unique.
+        trackList[trackID] = trackInformation
     })
 }
 
