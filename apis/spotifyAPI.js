@@ -4,7 +4,6 @@ const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token/'
 const SPOTIFY_API_URL = 'https://api.spotify.com/v1/'
 const ARTIST_DEGREE = process.env.SEARCH_DEGREE
 
-//TODO: Move all functions below to a new file for spotify apis.
 export async function searchSpotify(authentication, searchURL) {
     return fetch(searchURL, {
         headers: {
@@ -20,6 +19,7 @@ export async function searchSpotify(authentication, searchURL) {
             return res;
         });
 }
+
 //TODO: Implement limit of how many features can be added to the artistList per artist.
 export function traverseArtists(res, artistList, artistExplored, musicToArtist) {
     //Iterate through all tracks in res.
@@ -124,7 +124,6 @@ export async function populateSpotifyData(spotifyAuthentication, artistsToExplor
             while (SEARCH_DETAILS != null) {
                 try {
                     //Add the current artist to list of names to traverse.
-                    //TODO: Make into while loop, check the "next" key if its null or to continue loop or not.
                     var artistDetails = await searchSpotify(spotifyAuthentication, SEARCH_DETAILS)
 
                     //Check if there are still more songs to traverse for the current artist, if there are dont add to list and put the artist back onto the front of the list.
@@ -149,10 +148,6 @@ export async function populateSpotifyData(spotifyAuthentication, artistsToExplor
                     throw e
                 }
             }
-
-            //console.log(currentDegree)
-            //console.log(artistsToExplore)
-            //console.log(visitedArtists)
             //TODO: Figure out if we need to add the if statements into the try/catch
             currExplored++
 
@@ -171,12 +166,6 @@ export async function populateSpotifyData(spotifyAuthentication, artistsToExplor
     }
 
     const stop = Date.now()
-
     console.log(`seconds elapsed = ${Math.floor((stop - start) / 1000)}`)
-
-    //TODO: Save files with artist data, including artistsToExplore, visitedArtists, and tracksToArtist
-    console.log(visitedArtists)
-    console.log(artistsToExplore)
-    console.log(tracksToArtist)
 }
 
