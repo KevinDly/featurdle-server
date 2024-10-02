@@ -12,8 +12,15 @@ const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token/'
 const SPOTIFY_API_URL = 'https://api.spotify.com/v1/'
 const ARTIST_DEGREE = process.env.SEARCH_DEGREE
 
-connectAPIs()
+initializeServer()
 
+function initializeServer() {
+    //TODO: Implement file checking for artist and track data, update from spotify only when files older than certain amount of time (specified in env)
+    connectAPIs()
+}
+
+
+//TODO: Move all functions below to a new file for spotify apis.
 async function searchSpotify(authentication, searchURL) {
     return fetch(searchURL, {
         headers: {
@@ -32,7 +39,7 @@ async function searchSpotify(authentication, searchURL) {
 
 
 //TODO: Implement limit of how many features can be added to the artistList per artist.
-//TODO: Find way to differentiate tracks that have different IDs but are the same (sorting artists on track, hashing, then checking?)
+//TODO: Fix reading for special characters, like characters with accents.
 function traverseArtists(res, artistList, artistExplored, musicToArtist) {
     //Iterate through all tracks in res.
     res.tracks.items.forEach(track => {
@@ -48,11 +55,17 @@ function traverseArtists(res, artistList, artistExplored, musicToArtist) {
             return
         }
 
-        //Check if the track exists in the list, if not add a hashmap.
+        //Check if the track exists in the list, if not initialize it in the table with an empty object.
         if(!(trackName in musicToArtist)) {
             musicToArtist[trackName] = {}
-        } //If the track exists check if the id already exists, if it does return.
-        else if(trackID in musicToArtist[trackName]) {
+        }
+
+        //Create key out of artist names.
+        let artistNames = trackArtists.map(artist => artist.name)
+        const artistsNameString = artistNames.sort().toString()
+
+        //Check if same track exists with the same features.
+        if(artistsNameString in musicToArtist[trackName]) {
             return
         }
 
@@ -61,11 +74,9 @@ function traverseArtists(res, artistList, artistExplored, musicToArtist) {
         //Add artists to list.
         let trackInformation = {}
 
-        //Grab list of artists.
-        let artistNames = []
-        for (const artist of trackArtists) {
-            const artistName = artist.name
-            artistNames.push(artistName)
+        //Add all related artists to the list of artists to explore.
+        for(const artistName of artistNames) {
+            //Only add if we haven't explored the artist before and if the artist isn't set to be explored in the future.
             if(!artistList.includes(artistName) && !artistExplored.has(artistName)){
                 artistList.push(artistName)
             }
@@ -76,7 +87,7 @@ function traverseArtists(res, artistList, artistExplored, musicToArtist) {
         trackInformation['imageURL'] = trackImage
 
         //Add tracks to list if it is unique.
-        trackList[trackID] = trackInformation
+        trackList[artistsNameString] = trackInformation
     })
 }
 
@@ -183,10 +194,12 @@ async function connectAPIs() {
         console.error(e)
         //console.log(artistsToExplore)
     }
+
     const stop = Date.now()
 
     console.log(`seconds elapsed = ${Math.floor((stop - start) / 1000)}`)
 
+    //TODO: Save files with artist data, including artistsToExplore, visitedArtists, and tracksToArtist
     console.log(visitedArtists)
     console.log(artistsToExplore)
     console.log(tracksToArtist)
