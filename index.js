@@ -39,7 +39,6 @@ async function searchSpotify(authentication, searchURL) {
 
 
 //TODO: Implement limit of how many features can be added to the artistList per artist.
-//TODO: Fix reading for special characters, like characters with accents.
 function traverseArtists(res, artistList, artistExplored, musicToArtist) {
     //Iterate through all tracks in res.
     res.tracks.items.forEach(track => {
