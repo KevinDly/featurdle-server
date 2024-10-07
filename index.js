@@ -3,7 +3,7 @@ import { authenticateSpotify, populateSpotifyData } from './apis/spotifyAPI.js'
 import './env.js'
 import fs from 'fs'
 import FileSystemHandle from 'fs/promises'
-import { WebSocket, WebSocketServer } from 'ws'
+import { WebSocketServer } from 'ws'
 
 let artistsToExplore = [process.env.INITIAL_ARTIST]
 let visitedArtists = new Set([])
@@ -99,7 +99,6 @@ async function initializeData() {
 }
 
 async function initializeServer() {
-
     await initializeData()
 
     server.on('connection', (client) => {
