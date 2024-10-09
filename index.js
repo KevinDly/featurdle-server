@@ -4,10 +4,15 @@ import './env.js'
 import fs from 'fs'
 import FileSystemHandle from 'fs/promises'
 import { WebSocketServer } from 'ws'
+import * as events from './consts/eventNames.js'
 
+//Spotify Data
 let artistsToExplore = [process.env.INITIAL_ARTIST]
 let visitedArtists = new Set([])
 let tracksToArtist = {}
+
+//Websocket Data
+let idToSocket = {}
 
 const SERVER_PORT = Number(process.env.SERVER_PORT)
 const DATA_FOLDER = process.env.DATA_FOLDER
@@ -98,12 +103,45 @@ async function initializeData() {
     console.log(tracksToArtist)
 }
 
+
+//TODO: Implement heartbeat detection to determine if connection closed.
 async function initializeServer() {
     await initializeData()
+
+    //TODO: Implement disconnect logic when in game.
+    const interval = setInterval(function ping() { 
+        server.clients.forEach(function each(socket) {
+            console.log("Pinging")
+                
+            if(socket.isAlive === false) return socket.terminate();
+
+            socket.isAlive = false
+            socket.ping()
+        })
+    }, 30000)
 
     server.on('connection', (client) => {
         console.log("Connection!")
         console.log(client)
+
+        //Generate ID per socket.
+        //TODO: Replace random with actual unique IDs.
+        const socketID = Math.floor(Math.random() * 100000)
+        client.ID = socketID
+
+        //Setup variable for heartbeats.
+        client.isAlive = true
+
+        //Give client the initial connection ID.
+        const connectionPacket = {
+            event: events.WS_INITIAL_CONNECTION,
+            data: {
+                ID: socketID
+            }
+        }
+
+        client.send(JSON.stringify(connectionPacket))
+
         client.on('message', (message) => {
             //TODO: Add code for connecting.
             // Need code for events:
@@ -112,11 +150,17 @@ async function initializeServer() {
             console.log(message)
         })
 
-        client.on('close', (message) => {
+        client.on('close', (message, buffer) => {
             //TODO: Need to properly handle cleanup for related client.
             // Check what information the message sends.
-            console.log('Client message!')
-            console.log(message)
+            console.log('Client close!')
+            console.log(`Code: ${message}`)
+            console.log(client.ID)
+            
+        })
+
+        client.on('pong', function heartbeat() {
+            this.isAlive = true
         })
     })
 
