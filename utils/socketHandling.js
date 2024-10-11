@@ -117,3 +117,15 @@ export function handleClientMessage(client, message) {
             console.log(messageData)
     }
 }
+
+//Creates a packet and converts it to a string for websocket usage.
+//eventName: Required, name of the event.
+//messageData: Optional, the data that must be sent to server. If empty sends empty object.
+export function createPacket(eventName, messageData = {}) {
+    const message = {
+        event: eventName,
+        data: messageData
+    }
+
+    return JSON.stringify(message)
+}
