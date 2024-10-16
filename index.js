@@ -8,8 +8,8 @@ import { enableHeartbeat, configureClientConnection } from './utils/socketHandli
 
 //Spotify Data
 let artistsToExplore = [process.env.INITIAL_ARTIST]
-let visitedArtists = new Set([])
-let tracksToArtist = {}
+export let visitedArtists = new Set([])
+export let tracksToArtist = {}
 
 //Websocket Data
 export let idToSocket = {}

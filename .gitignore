@@ -146,3 +146,5 @@ dist
 #Local Data
 error/
 data/
+
+eventData.txt

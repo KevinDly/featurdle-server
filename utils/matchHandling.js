@@ -1,4 +1,4 @@
-import { idToSocket, matches } from '../index.js';
+import { idToSocket, matches, visitedArtists, tracksToArtist } from '../index.js';
 import { createPacket } from './socketHandling.js';
 import * as events from '../consts/eventNames.js'
 
@@ -36,37 +36,48 @@ export function createMatch(ID1, ID2) {
         player1: ID1,
         player2: ID2,
         tracksUsed: [],
-        artistConnectionCount: {}
+        artistConnectionCount: {},
+        currentPlayer: 0
     }
 
     //Insert match into list.
     matches[matchID] = matchData
 
-    //TODO: Coin flip for who starts.
+    //Initiate coinflip for first player.
     const coinFlip = Math.floor(Math.random())
     const coinWinnerID = coinFlip ? ID1 : ID2
-    //TODO: Send match data to clients.
 
+    //Determine initial artist.
+    const randomArrayIndex = Math.floor(Math.random() * visitedArtists.size)
+    const visitedArtistsArray = Array.from(visitedArtists)
+    const initialArtist = visitedArtistsArray[randomArrayIndex]
+    matchData['artistConnectionCount'][initialArtist] = 0
+    matchData['tracksUsed'] = [[initialArtist]]
+
+    //Send match data to clients.
     console.log("Sending initial data to clients.")
     for(const playerID of playerIDs) {
 
         const playerClient = idToSocket[playerID]
-        
-        console.log(playerClient)
         const isPlayerFirst = coinWinnerID === playerID ? 0 : 1
+
+        console.log(`${playerID} is ${isPlayerFirst}`)
         let playerInitialData = {
             matchID: matchID,
-            playerOrder: isPlayerFirst
+            playerOrder: isPlayerFirst,
+            firstArtist: initialArtist
         }
 
-        if(isPlayerFirst)
+        if(!isPlayerFirst) {
+            console.log("Updating first player data.")
             matchData["currentPlayer"] = playerID
+        }
 
         //TODO: Check if you need to await this before starting game.
-        playerClient.send(createPacket(events.WS_INITIAL_CONNECTION, playerInitialData))
+        playerClient.send(createPacket(events.WS_PREGAME_DATA, playerInitialData))
     }
 
-    //TODO: Call function to begin match.
+    //Call function to begin match.
     startGame(matchID)
 }
 
@@ -83,12 +94,34 @@ function startGame(matchID) {
 }
 
 //Function that updates the game.
-function updateGame(gamePacket) {
+export function updateGame(gamePacket) {
+    console.log("Updating game")
     const matchID = gamePacket["matchID"]
+
     const matchData = matches[matchID]
+    const playerSentOrder = gamePacket['playerNumber']
+
+    const playerSentID = gamePacket['playerID']
+    const playerSocket = idToSocket[playerSentID]
+
+    console.log(`${matchID} ${playerSentOrder}`)
+    console.log(gamePacket)
+    console.log(matchData['currentPlayer'])
+
+    console.log(playerSentID)
+    //Check if the player sending the data's turn is current.
+    if(matchData['currentPlayer'] !== playerSentID) {
+        playerSocket.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
+            event: events.EVENT_INVALID_TURN
+        }))
+
+        return
+    }
 
     //Check packet information.
         //Need to grab what data they sent.
+    const gameEvent = gamePacket['event']
+
 
     //Check if the player that sent the
 }

@@ -1,5 +1,5 @@
 import { idToSocket, clientQueue, matches, server } from '../index.js';
-import { createMatch } from './matchHandling.js'
+import { createMatch, updateGame } from './matchHandling.js'
 import * as events from '../consts/eventNames.js'
 
 export function handleClientDisconnect(client) {
@@ -111,6 +111,9 @@ export function handleClientMessage(client, message) {
             else {
                 createMatch(clientQueue.shift(), clientID)
             }
+            break;
+        case events.WS_CLIENT_UPDATE_GAME:
+            updateGame(messageData)
             break;
         default:
             console.log(`Unhandled event ${currentEvent}`)
