@@ -31,10 +31,9 @@ export function createMatch(ID1, ID2) {
     
 
     //Initialize actual match data.
-    //TODO: For actual match logic, put the data in for the artists and tracks.
+    //TODO: Possibly store the sockets instead of the IDs?
     const matchData = {
-        player1: ID1,
-        player2: ID2,
+        players: [idToSocket[ID1], idToSocket[ID2]],
         tracksUsed: [],
         artistConnectionCount: {},
         currentPlayer: 0
@@ -84,7 +83,7 @@ export function createMatch(ID1, ID2) {
 //Function that tells the clients to start the game.
 function startGame(matchID) {
     const matchData = matches[matchID]
-    const playerIDs = [matchData.player1, matchData.player2]
+    const playerIDs = [matchData.players[0].ID, matchData.players[1].ID]
 
     for(const playerID of playerIDs) {
         console.log(playerID)
@@ -94,34 +93,134 @@ function startGame(matchID) {
 }
 
 //Function that updates the game.
-export function updateGame(gamePacket) {
+export function updateGame(gamePacket, client) {
+    //TODO: Check if player is even in match.
     console.log("Updating game")
+    if(!('currentMatchID' in client)) {
+        console.log("Player is not in a game!")
+        playerSocket.send(createPacket(events.WS_ERROR))
+
+        return
+    }
     const matchID = gamePacket["matchID"]
 
     const matchData = matches[matchID]
     const playerSentOrder = gamePacket['playerNumber']
 
-    const playerSentID = gamePacket['playerID']
+    const playerSentID = client.ID
     const playerSocket = idToSocket[playerSentID]
 
     console.log(`${matchID} ${playerSentOrder}`)
     console.log(gamePacket)
     console.log(matchData['currentPlayer'])
-
     console.log(playerSentID)
+    
     //Check if the player sending the data's turn is current.
     if(matchData['currentPlayer'] !== playerSentID) {
+        console.log("Update was not send by the correct player.")
         playerSocket.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
             event: events.EVENT_INVALID_TURN
         }))
-
         return
     }
 
     //Check packet information.
         //Need to grab what data they sent.
     const gameEvent = gamePacket['event']
+    console.log(`Game event: ${gameEvent}`)
+    //Determine event given the outcome.
+    switch(gameEvent) {
+        case events.EVENT_PLAYER_TRACK_SUBMISSION:
+            console.log("Checking if track information!")
+            handlePlayerTrackSubmission(gamePacket, matchData, client)
+            break
+        default:
+            break
+    }
+}
 
+//TODO: Think about where to put the client information and match information.
+function handlePlayerTrackSubmission(gamePacket, matchData, incomingClient) {
+    const submittedTrack = gamePacket['track']
+    console.log(`${incomingClient.ID} has submitted ${submittedTrack}`)
+    //Filter the tracks we have based on the given input.
+    let tracks = Object.keys(tracksToArtist)
+    let potentialTracks = tracks.filter((track) => {
+        return track.includes(submittedTrack)
+    })
 
-    //Check if the player that sent the
+    console.log(`Potential Tracks: ${potentialTracks}`)
+    //TODO: The below comments.
+    //Check if the sent track doesn't match.
+    if(potentialTracks.length === 0) {
+        //If it doesn't match any tracks send an invalid search packet to the original client.
+        incomingClient.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
+            event: events.EVENT_INVALID_CHOICE
+        }))
+
+        return
+    }
+
+    //Send client data to update the current list of tracks.
+    //Update current tracks in system.
+    const firstTrack = potentialTracks[0]
+    console.log(`First Track: ${firstTrack}`)
+
+    //TODO: Update this for when we have a UI
+    //Will need to check the features of the track rather than grabbing the first track.
+    const relatedArtistKey = Object.keys(tracksToArtist[firstTrack])[0]
+    console.log(`Related Artist Key: ${relatedArtistKey}`)
+    const track = tracksToArtist[firstTrack][relatedArtistKey]
+    const relatedArtists = tracksToArtist[firstTrack][relatedArtistKey]["artists"]
+    const tracksUsed = matchData['tracksUsed']
+    console.log(`Related Artists: ${relatedArtists}`)
+    const currentArtists = tracksUsed[tracksUsed.length - 1]
+    console.log(`Current Artists: ${currentArtists}`)
+
+    const artistLinks = relatedArtists.filter(artist => currentArtists.includes(artist))
+    console.log(`Links Made: ${artistLinks}`)
+    if(artistLinks.length == 0) {
+        console.log(`No artists links found with track ${firstTrack}`)
+        incomingClient.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
+            event: events.EVENT_INVALID_CHOICE
+        }))
+
+        return
+    }
+
+    console.log(artistLinks)
+    //Put the track into the list.
+    tracksUsed.push(track)
+    //Then put the links that were made into the list.
+    tracksUsed.push(artistLinks)
+    //Finally, update the links in artistConnectionCount
+    const artistConnectionCount = matchData['artistConnectionCount']
+    for(const artist of artistLinks) {
+        artistConnectionCount[artist] = !(artist in artistConnectionCount) ? 1 : artistConnectionCount[artist] + 1
+    }
+
+    console.log(matchData)
+
+    //Send the new data to each player.
+    const updatedData = [track, artistLinks]
+
+    for(const client of matchData['players']) {
+        console.log(client)
+        client.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
+            event: events.EVENT_UPDATE_TIMELINE,
+            trackUpdates: updatedData,
+        }))
+    }
+
+    //Swap whoever is the current player.
+    //TODO: Update the current player
+    swapCurrentPlayer(matchData)
+    console.log(matchData)
+}
+
+function swapCurrentPlayer(matchData) {
+    const firstPlayer = matchData['players'][0]
+    const secondPlayer = matchData['players'][1]
+
+    matchData['currentPlayer'] = matchData['currentPlayer'] == firstPlayer.ID ? secondPlayer.ID : firstPlayer.ID
 }

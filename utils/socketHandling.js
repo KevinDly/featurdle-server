@@ -23,7 +23,7 @@ export function handleClientDisconnect(client) {
         console.log(`Ending match with ID of ${clientMatchID}`)
         let matchToEnd = matches[clientMatchID]
         delete matches[clientMatchID]
-        const idToWin = matchToEnd['player2'] === disconnectedID ? matchToEnd['player1'] : matchToEnd['player2']
+        const idToWin = matchToEnd['players'][1]['ID'] === disconnectedID ? matchToEnd['players'][0]['ID'] : matchToEnd['players'][1]['ID']
         idToSocket[idToWin]['currentMatchID'] = -1
         //TODO: Send correct data to opposing client to signify opponent disconnect + player win.
     }
@@ -113,7 +113,7 @@ export function handleClientMessage(client, message) {
             }
             break;
         case events.WS_CLIENT_UPDATE_GAME:
-            updateGame(messageData)
+            updateGame(messageData, client)
             break;
         default:
             console.log(`Unhandled event ${currentEvent}`)

@@ -9,9 +9,10 @@ export const WS_PREGAME_DATA = "wsPregameData" //Sending initial match data.
 export const WS_START_GAME = "wsStartGame" //Telling clients to begin game.
 export const WS_CLIENT_SEARCH_DATA = "wsClientSearchData" //Search results from client.
 export const WS_SEARCH_RESULT = "wsSearchResult" //Search result from a client search.
+export const WS_ERROR = "wsError"
 
 //Incoming Game Events
-export const EVENT_SEARCH_TRACK = "eventSearchTrack"
+export const EVENT_PLAYER_TRACK_SUBMISSION = "eventPlayerSubmission"
 
 //Outgoing Game Events
 export const EVENT_UPDATE_TIMELINE = "eventUpdateTimeline"
