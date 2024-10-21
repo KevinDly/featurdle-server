@@ -9,6 +9,7 @@ export const WS_PREGAME_DATA = "wsPregameData" //Sending initial match data.
 export const WS_START_GAME = "wsStartGame" //Telling clients to begin game.
 export const WS_CLIENT_SEARCH_DATA = "wsClientSearchData" //Search results from client.
 export const WS_SEARCH_RESULT = "wsSearchResult" //Search result from a client search.
+export const WS_MATCH_END = "wsMatchEnd"
 export const WS_ERROR = "wsError"
 
 //Incoming Game Events
@@ -16,10 +17,14 @@ export const EVENT_PLAYER_TRACK_SUBMISSION = "eventPlayerSubmission"
 
 //Outgoing Game Events
 export const EVENT_UPDATE_TIMELINE = "eventUpdateTimeline"
+export const EVENT_UPDATE_TURN = "eventUpdateTurn"
 export const EVENT_INVALID_CHOICE = "eventInvalidChoice"
 export const EVENT_INVALID_TURN = "eventInvalidTurn"
+export const EVENT_WIN = "eventWin"
+export const EVENT_LOSS = "eventLoss"
 
 //Game Variables
 export const PLAYER1 = 0
 export const PLAYER2 = 1
+export const turnTimeinSeconds = 10
 

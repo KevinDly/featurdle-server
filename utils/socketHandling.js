@@ -1,5 +1,5 @@
-import { idToSocket, clientQueue, matches, server } from '../index.js';
-import { createMatch, updateGame } from './matchHandling.js'
+import { idToSocket, clientQueue, matches, server, reassignQueue } from '../index.js';
+import { cleanupMatch, createMatch, updateGame } from './matchHandling.js'
 import * as events from '../consts/eventNames.js'
 
 export function handleClientDisconnect(client) {
@@ -14,18 +14,19 @@ export function handleClientDisconnect(client) {
     const queueIndex = clientQueue.indexOf(disconnectedID)
     if (queueIndex != -1) {
         console.log(`Removing ${disconnectedID} from queue.`)
-        clientQueue = clientQueue.splice(clientQueue, 1)
+        reassignQueue(clientQueue.splice(clientQueue, 1))
     }
 
     //Handle disconnect logic for matching.
     const clientMatchID = client['currentMatchID']
     if (clientMatchID != -1) {
         console.log(`Ending match with ID of ${clientMatchID}`)
+
+        //Grab the match data.
         let matchToEnd = matches[clientMatchID]
-        delete matches[clientMatchID]
-        const idToWin = matchToEnd['players'][1]['ID'] === disconnectedID ? matchToEnd['players'][0]['ID'] : matchToEnd['players'][1]['ID']
-        idToSocket[idToWin]['currentMatchID'] = -1
-        //TODO: Send correct data to opposing client to signify opponent disconnect + player win.
+
+        //Clear the timer for the match if one does exist.
+        cleanupMatch(matchToEnd, disconnectedID, disconnect = true);
     }
 
 }

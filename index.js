@@ -117,3 +117,7 @@ async function initializeServer() {
     })
 
 }
+
+export function reassignQueue(newQueue) {
+    clientQueue = newQueue
+}
