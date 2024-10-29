@@ -1,4 +1,4 @@
-import { idToSocket, clientQueue, matches, server, reassignQueue } from '../index.js';
+import { idToSocket, clientQueue, matches } from '../../index.js';
 import { cleanupMatch, createMatch, updateGame } from './matchHandling.js'
 import * as events from '../consts/eventNames.js'
 
@@ -14,7 +14,7 @@ export function handleClientDisconnect(client) {
     const queueIndex = clientQueue.indexOf(disconnectedID)
     if (queueIndex != -1) {
         console.log(`Removing ${disconnectedID} from queue.`)
-        reassignQueue(clientQueue.splice(clientQueue, 1))
+        clientQueue.splice(queueIndex, 1)
     }
 
     //Handle disconnect logic for matching.
@@ -26,12 +26,12 @@ export function handleClientDisconnect(client) {
         let matchToEnd = matches[clientMatchID]
 
         //Clear the timer for the match if one does exist.
-        cleanupMatch(matchToEnd, disconnectedID, disconnect = true);
+        cleanupMatch(matchToEnd, disconnectedID, true);
     }
 
 }
 
-export function enableHeartbeat() {
+export function enableHeartbeat(server) {
     return setInterval(function ping() {
         server.clients.forEach(function each(socket) {
             console.log("Pinging")
@@ -95,7 +95,6 @@ export function configureClientConnection(client) {
 
 export function handleClientMessage(client, message) {
     console.log('Client message!')
-    console.log(message)
 
     const messageJSON = JSON.parse(message)
 
@@ -104,14 +103,7 @@ export function handleClientMessage(client, message) {
 
     switch (messageEvent) {
         case events.WS_CONNECTING:
-            const clientID = client.ID
-            console.log(clientID)
-            if (clientQueue.length == 0) {
-                clientQueue.push(clientID)
-            }
-            else {
-                createMatch(clientQueue.shift(), clientID)
-            }
+            handleConnection(client);
             break;
         case events.WS_CLIENT_UPDATE_GAME:
             updateGame(messageData, client)
@@ -119,6 +111,17 @@ export function handleClientMessage(client, message) {
         default:
             console.log(`Unhandled event ${currentEvent}`)
             console.log(messageData)
+    }
+}
+
+function handleConnection(client) {
+    const clientID = client.ID;
+    console.log(clientID);
+    if (clientQueue.length == 0) {
+        clientQueue.push(clientID);
+    }
+    else {
+        createMatch(clientQueue.shift(), clientID);
     }
 }
 

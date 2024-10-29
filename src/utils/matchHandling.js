@@ -1,4 +1,5 @@
-import { idToSocket, matches, visitedArtists, tracksToArtist } from '../index.js';
+import { idToSocket, matches } from '../../index.js';
+import { visitedArtists, tracksToArtist } from './gameData.js'
 import { createPacket } from './socketHandling.js';
 import * as events from '../consts/eventNames.js'
 
@@ -35,12 +36,13 @@ export function createMatch(ID1, ID2) {
     const matchData = {
         matchID: matchID,
         players: [idToSocket[ID1], idToSocket[ID2]],
-        tracksUsed: [],
+        timeline: [],
         artistConnectionCount: {},
         playerHealth: {
             [ID1]: 3,
             [ID2]: 3
         },
+        tracksUsed: new Set(),
         currentPlayer: 0,
         currTimer: null
     }
@@ -57,7 +59,7 @@ export function createMatch(ID1, ID2) {
     const visitedArtistsArray = Array.from(visitedArtists)
     const initialArtist = visitedArtistsArray[randomArrayIndex]
     matchData['artistConnectionCount'][initialArtist] = 0
-    matchData['tracksUsed'] = [[initialArtist]]
+    matchData['timeline'] = [[initialArtist]]
 
     //Send match data to clients.
     console.log("Sending initial data to clients.")
@@ -105,6 +107,7 @@ function startGame(matchID) {
 
 function resetTimer(matchData) {
     const turnTimeinMilis = events.turnTimeinSeconds * 1000;
+    console.log(`Reset Timer: ${Date.now()}`)
     const turnIntervalEnd = setTimeout(() => handleTimerEnd(matchData), turnTimeinMilis);
     const turnEndTime = Date.now() + (turnTimeinMilis);
     matchData['currTimer'] = turnIntervalEnd;
@@ -113,6 +116,7 @@ function resetTimer(matchData) {
 
 //Handle the turn timer ending.
 function handleTimerEnd(matchData) {
+    console.log(`Handling Timer End: ${Date.now()}`)
     //Subtract health from current player's healthbar
     const currentPlayer = matchData['currentPlayer']
     const playerHealth = matchData['playerHealth']
@@ -151,6 +155,7 @@ export function updateGame(gamePacket, client) {
 
         return
     }
+    
     const matchID = gamePacket["matchID"]
 
     const matchData = matches[matchID]
@@ -180,7 +185,7 @@ export function updateGame(gamePacket, client) {
     //Determine event given the outcome.
     switch(gameEvent) {
         case events.EVENT_PLAYER_TRACK_SUBMISSION:
-            console.log("Checking if track information!")
+            console.log("Checking if track information is correct!")
             handlePlayerTrackSubmission(gamePacket, matchData, client)
             break
         default:
@@ -211,27 +216,43 @@ function handlePlayerTrackSubmission(gamePacket, matchData, incomingClient) {
         return
     }
 
-    //Clear timer.
-    clearTimeout(matchData['timerEnd'])
-
-    //Send client data to update the current list of tracks.
-    //Update current tracks in system.
+    //TODO: Update this for when we have a UI
+    //Will need to check the features of the track rather than grabbing the first track.
     const firstTrack = potentialTracks[0]
     console.log(`First Track: ${firstTrack}`)
 
-    //TODO: Update this for when we have a UI
-    //Will need to check the features of the track rather than grabbing the first track.
+    //Check if we've used the sent track before.
+    const tracksUsed = matchData['tracksUsed']
+    if(tracksUsed.has(firstTrack)) {
+        incomingClient.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
+            event: events.EVENT_INVALID_CHOICE
+        }))
+
+        return
+    }
+
+    //Add the current track to our set of used tracks.
+    tracksUsed.add(firstTrack)
+
+    //Grab the track data from the table.
     const relatedArtistKey = Object.keys(tracksToArtist[firstTrack])[0]
     console.log(`Related Artist Key: ${relatedArtistKey}`)
     const track = tracksToArtist[firstTrack][relatedArtistKey]
+
+    //Grab the artists of the current track.
     const relatedArtists = tracksToArtist[firstTrack][relatedArtistKey]["artists"]
-    const tracksUsed = matchData['tracksUsed']
+    const timeline = matchData['timeline']
     console.log(`Related Artists: ${relatedArtists}`)
-    const currentArtists = tracksUsed[tracksUsed.length - 1]
+
+    //If there is no elements besides the artist, grab the first artist in the timeline, otherwise grab the artists of the previous track.
+    const currentArtists = timeline.length === 1 ? timeline[timeline.length - 1] : timeline[timeline.length - 2]['artists']
     console.log(`Current Artists: ${currentArtists}`)
 
+    //Check for the links.
     const artistLinks = relatedArtists.filter(artist => currentArtists.includes(artist))
     console.log(`Links Made: ${artistLinks}`)
+
+    //Check if there are valid artist links, if not return invalid choice.
     if(artistLinks.length == 0) {
         console.log(`No artists links found with track ${firstTrack}`)
         incomingClient.send(createPacket(events.WS_SERVER_UPDATE_GAME, {
@@ -241,18 +262,20 @@ function handlePlayerTrackSubmission(gamePacket, matchData, incomingClient) {
         return
     }
 
+    //Clear timer since artist was valid.
+    clearTimeout(matchData['currTimer'])
+    console.log(`After timeout clear: ${matchData['currTimer']}`)
+
     console.log(artistLinks)
     //Put the track into the list.
-    tracksUsed.push(track)
+    timeline.push(track)
     //Then put the links that were made into the list.
-    tracksUsed.push(artistLinks)
+    timeline.push(artistLinks)
     //Finally, update the links in artistConnectionCount
     const artistConnectionCount = matchData['artistConnectionCount']
     for(const artist of artistLinks) {
         artistConnectionCount[artist] = !(artist in artistConnectionCount) ? 1 : artistConnectionCount[artist] + 1
     }
-
-    console.log(matchData)
 
     //Send the new data to each player.
     const updatedData = [track, artistLinks]
@@ -266,8 +289,6 @@ function handlePlayerTrackSubmission(gamePacket, matchData, incomingClient) {
 
     //Swap whoever is the current player.
     swapCurrentPlayer(matchData)
-
-    console.log(matchData)
 }
 
 function swapCurrentPlayer(matchData) {
@@ -299,9 +320,20 @@ export function cleanupMatch(matchData, losingID, disconnect = false) {
 
     //Grant win to player.
     const idToWin = matchData['players'][1]['ID'] === losingID ? matchData['players'][0]['ID'] : matchData['players'][1]['ID']
-    idToSocket[idToWin]['currentMatchID'] = -1
+    const winningClient = idToSocket[idToWin]
+    winningClient['currentMatchID'] = -1
+    console.log(`Reset match ID: ${idToWin} ${idToSocket[idToWin]['currentMatchID']}`)
 
     if(!disconnect) {
         idToSocket[losingID]['currentMatchID'] = -1
+        console.log(`Reset match ID: ${losingID} ${idToSocket[losingID]['currentMatchID']}`)
     }
+    else {
+        //Send win to player if the other player was a disconnect.
+        winningClient.send(createPacket(events.WS_MATCH_END, {
+            event: events.EVENT_WIN
+        }))
+    }
+
+    console.log(matches)
 }

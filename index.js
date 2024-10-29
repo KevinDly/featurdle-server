@@ -1,66 +1,32 @@
 //TODO: Find better way to import env.
-import { authenticateSpotify, populateSpotifyData } from './apis/spotifyAPI.js'
-import './env.js'
+import { authenticateSpotify, populateSpotifyData } from './src/apis/spotifyAPI.js'
+import './src/env.js'
 import fs from 'fs'
-import FileSystemHandle from 'fs/promises'
 import { WebSocketServer } from 'ws'
-import { enableHeartbeat, configureClientConnection } from './utils/socketHandling.js'
-
-//Spotify Data
-let artistsToExplore = [process.env.INITIAL_ARTIST]
-export let visitedArtists = new Set([])
-export let tracksToArtist = {}
+import { enableHeartbeat, configureClientConnection } from './src/utils/socketHandling.js'
+import { loadDataFromFile, saveDataToFile } from './src/utils/fileIO.js'
+import { artistsToExplore, visitedArtists, tracksToArtist } from './src/utils/gameData.js'
 
 //Websocket Data
 export let idToSocket = {}
 export let clientQueue = []
 export let matches = {}
 
-const SERVER_PORT = Number(process.env.SERVER_PORT)
+//File IO
 const DATA_FOLDER = process.env.DATA_FOLDER
 const DATA_FILENAME = process.env.DATA_FILENAME
 const fileLocation = DATA_FOLDER + '/' + DATA_FILENAME
+
+const SERVER_PORT = Number(process.env.SERVER_PORT)
 const SECONDS_TO_DAY = 86400
-export const server = new WebSocketServer({ port: SERVER_PORT })
+
+const server = new WebSocketServer({ port: SERVER_PORT })
 
 //TODO: Might need to move these to a config or something instead of env?
 const MAX_DAYS_FROM_WRITE = Number(process.env.MAX_DAYS_FROM_WRITE)
 const ALWAYS_UPDATE_SPOTIFY = process.env.ALWAYS_UPDATE_SPOTIFY === 'true'
 
 initializeServer()
-
-async function loadDataFromFile() {
-    try {
-        let fileData = await FileSystemHandle.readFile(fileLocation)
-        let jsonFileData = JSON.parse(fileData)
-
-        artistsToExplore = jsonFileData['artistsToExplore']
-        visitedArtists = new Set(jsonFileData['visitedArtists'])
-        tracksToArtist = jsonFileData['tracksToArtist']
-    }
-    catch (e) {
-        console.log(e)
-    }
-}
-
-function saveDataToFile() {
-    const spotifyDataObject = {
-        "visitedArtists": Array.from(visitedArtists),
-        "tracksToArtist": tracksToArtist,
-        "artistsToExplore": artistsToExplore
-    }
-
-    console.log(visitedArtists)
-    try {
-        fs.writeFile(fileLocation, JSON.stringify(spotifyDataObject), (err) => {
-            if (err) throw err;
-            console.log(`Saved file to ${fileLocation}`)
-        })
-    }
-    catch (e) {
-        console.error(e)
-    }
-}
 
 async function initializeData() {
     let dataStats = null
@@ -92,14 +58,13 @@ async function initializeData() {
         await populateSpotifyData(spotifyAuthentication, artistsToExplore, visitedArtists, tracksToArtist)
 
         console.log("Saving data from Spotify.")
-        saveDataToFile()
+        saveDataToFile(fileLocation)
     }
     else { //If the file is still recent enough, load from file.
         console.log("Loading artist and track data from file.")
-        await loadDataFromFile()
+        await loadDataFromFile(fileLocation)
     }
 
-    //TODO: Write basic server functionality for connection.
     console.log(artistsToExplore)
     console.log(visitedArtists)
     console.log(tracksToArtist)
@@ -110,14 +75,10 @@ async function initializeServer() {
     await initializeData()
 
     //TODO: Delete when server is off.
-    const interval = enableHeartbeat()
+    const interval = enableHeartbeat(server)
 
     server.on('connection', (client) => {
         configureClientConnection(client)
     })
 
-}
-
-export function reassignQueue(newQueue) {
-    clientQueue = newQueue
 }
