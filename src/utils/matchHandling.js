@@ -132,7 +132,7 @@ function handleTimerEnd(matchData) {
     }
 }
 
-//TODO: Implement game ending scenario.
+//TODO: Decouple cleaning up the match from triggering a game end.
 function triggerGameEnd(matchData, losingPlayerID) {
     //Send corresponding win/loss trigger to the winning/losing player.
     for(const client of matchData['players']) {
